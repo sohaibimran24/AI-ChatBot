@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SohaibBot — Orbital AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#05060f;
+    --void-deep:#020208;
+    --panel:#0b0e1f;
+    --panel-edge:#161a35;
+    --cyan:#3ef0ff;
+    --cyan-dim:#1c7c8a;
+    --magenta:#ff3ec8;
+    --gold:#ffd35c;
+    --violet:#8a6bff;
+    --text-hi:#eaf6ff;
+    --text-mid:#9fb3d6;
+    --text-dim:#5b6890;
+    --font-display:"Orbitron", sans-serif;
+    --font-body:"Rajdhani", sans-serif;
+    --font-mono:"Space Mono", monospace;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  html,body{
+    width:100%; height:100%;
+    background:var(--void);
+    color:var(--text-hi);
+    font-family:var(--font-body);
+    overflow:hidden;
+  }
+
+  /* ============ STARFIELD / SPACE BACKDROP ============ */
+  #space{
+    position:fixed; inset:0; z-index:0;
+    background:
+      radial-gradient(ellipse at 18% 12%, rgba(138,107,255,0.16), transparent 45%),
+      radial-gradient(ellipse at 82% 78%, rgba(62,240,255,0.10), transparent 50%),
+      radial-gradient(ellipse at 50% 100%, rgba(255,62,200,0.07), transparent 60%),
+      radial-gradient(circle at 50% 50%, var(--panel) 0%, var(--void) 55%, var(--void-deep) 100%);
+  }
+  #stars-near, #stars-far{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+  }
+  .star{
+    position:absolute; border-radius:50%;
+    background:#fff;
+    box-shadow:0 0 4px rgba(255,255,255,0.8);
+    animation:twinkle var(--dur) ease-in-out infinite;
+    animation-delay:var(--delay);
+  }
+  @keyframes twinkle{
+    0%,100%{opacity:.15;}
+    50%{opacity:1;}
+  }
+
+  .nebula-line{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    opacity:.5;
+  }
+
+  /* ============ LAYOUT SHELL ============ */
+  #app{
+    position:relative; z-index:2;
+    width:100%; height:100%;
+    display:grid;
+    grid-template-columns: 300px 1fr;
+  }
+
+  /* ============ ORBIT SIDEBAR ============ */
+  #orbit-panel{
+    position:relative;
+    border-right:1px solid rgba(62,240,255,0.12);
+    background:linear-gradient(180deg, rgba(11,14,31,0.55), rgba(5,6,15,0.35));
+    backdrop-filter: blur(6px);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+
+  #brand{
+    padding:22px 22px 14px;
+    border-bottom:1px solid rgba(62,240,255,0.10);
+    flex-shrink:0;
+  }
+  #brand .tag{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:.22em;
+    color:var(--cyan-dim);
+    text-transform:uppercase;
+  }
+  #brand h1{
+    font-family:var(--font-display);
+    font-size:22px;
+    letter-spacing:.04em;
+    background:linear-gradient(90deg, var(--cyan), var(--violet) 60%, var(--magenta));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    margin-top:4px;
+    text-shadow:0 0 28px rgba(62,240,255,0.25);
+  }
+  #brand .by{
+    font-size:11px;
+    color:var(--text-dim);
+    margin-top:6px;
+    font-family:var(--font-mono);
+  }
+
+  #orbit-stage{
+    position:relative;
+    flex:1;
+    min-height:0;
+  }
+  #orbit-svg{
+    width:100%; height:100%;
+    display:block;
+  }
+  .orbit-ring{
+    fill:none;
+    stroke:rgba(62,240,255,0.16);
+    stroke-width:1;
+  }
+  .orbit-ring.active{
+    stroke:rgba(62,240,255,0.45);
+  }
+  .core-glow{
+    filter:drop-shadow(0 0 18px rgba(62,240,255,0.9)) drop-shadow(0 0 38px rgba(138,107,255,0.5));
+  }
+  .planet{
+    cursor:pointer;
+    transition:filter .25s ease;
+  }
+  .planet:hover .planet-body, .planet.active .planet-body{
+    filter:drop-shadow(0 0 10px currentColor);
+  }
+  .planet-label{
+    font-family:var(--font-mono);
+    font-size:9.5px;
+    fill:var(--text-mid);
+    letter-spacing:.04em;
+    pointer-events:none;
+    text-transform:uppercase;
+  }
+  .planet.active .planet-label{
+    fill:var(--text-hi);
+  }
+
+  #topic-foot{
+    padding:14px 20px 18px;
+    border-top:1px solid rgba(62,240,255,0.10);
+    flex-shrink:0;
+  }
+  #topic-foot .lbl{
+    font-family:var(--font-mono);
+    font-size:9.5px;
+    letter-spacing:.18em;
+    color:var(--text-dim);
+    text-transform:uppercase;
+  }
+  #topic-name{
+    font-family:var(--font-display);
+    font-size:14px;
+    margin-top:4px;
+    color:var(--cyan);
+  }
+
+  /* ============ MAIN CHAT COLUMN ============ */
+  #main{
+    position:relative;
+    display:flex; flex-direction:column;
+    min-width:0;
+  }
+
+  #status-bar{
+    flex-shrink:0;
+    height:54px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 26px;
+    border-bottom:1px solid rgba(62,240,255,0.10);
+    background:linear-gradient(180deg, rgba(11,14,31,0.4), transparent);
+  }
+  .status-left{
+    display:flex; align-items:center; gap:10px;
+  }
+  .pulse-dot{
+    width:8px; height:8px; border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan), 0 0 16px var(--cyan);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1; transform:scale(1);}
+    50%{opacity:.4; transform:scale(.7);}
+  }
+  #status-text{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-mid);
+    letter-spacing:.05em;
+  }
+  .status-right{
+    display:flex; gap:18px;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--text-dim);
+    letter-spacing:.05em;
+  }
+  .status-right b{ color:var(--cyan); }
+
+  #scroll-area{
+    flex:1;
+    overflow-y:auto;
+    padding:28px 8% 18px;
+    scroll-behavior:smooth;
+  }
+  #scroll-area::-webkit-scrollbar{ width:6px; }
+  #scroll-area::-webkit-scrollbar-thumb{ background:rgba(62,240,255,0.25); border-radius:3px; }
+  #scroll-area::-webkit-scrollbar-track{ background:transparent; }
+
+  .msg-row{
+    display:flex; gap:12px;
+    margin-bottom:20px;
+    max-width:760px;
+    animation:rise .4s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes rise{
+    from{opacity:0; transform:translateY(10px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  .msg-row.user{ margin-left:auto; flex-direction:row-reverse; }
+
+  .avatar{
+    width:34px; height:34px; flex-shrink:0; border-radius:9px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px;
+  }
+  .avatar.bot{
+    background:radial-gradient(circle at 35% 30%, rgba(62,240,255,0.35), rgba(11,14,31,0.9));
+    border:1px solid rgba(62,240,255,0.4);
+    box-shadow:0 0 14px rgba(62,240,255,0.25);
+  }
+  .avatar.user{
+    background:radial-gradient(circle at 35% 30%, rgba(255,62,200,0.3), rgba(11,14,31,0.9));
+    border:1px solid rgba(255,62,200,0.35);
+    box-shadow:0 0 14px rgba(255,62,200,0.2);
+  }
+
+  .bubble{
+    padding:13px 16px;
+    border-radius:14px;
+    font-size:14.5px;
+    line-height:1.55;
+    white-space:pre-wrap;
+    position:relative;
+  }
+  .msg-row.bot .bubble{
+    background:linear-gradient(155deg, rgba(22,26,53,0.85), rgba(11,14,31,0.75));
+    border:1px solid rgba(62,240,255,0.18);
+    color:var(--text-hi);
+    border-top-left-radius:4px;
+  }
+  .msg-row.user .bubble{
+    background:linear-gradient(155deg, rgba(60,18,55,0.7), rgba(22,12,38,0.7));
+    border:1px solid rgba(255,62,200,0.22);
+    color:var(--text-hi);
+    border-top-right-radius:4px;
+  }
+  .msg-meta{
+    font-family:var(--font-mono);
+    font-size:9px;
+    color:var(--text-dim);
+    margin-top:5px;
+    letter-spacing:.04em;
+  }
+  .msg-row.user .msg-meta{ text-align:right; }
+
+  .typing .bubble{
+    display:flex; align-items:center; gap:5px; padding:14px 18px;
+  }
+  .tdot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--cyan);
+    animation:tbounce 1.2s ease-in-out infinite;
+  }
+  .tdot:nth-child(2){ animation-delay:.15s; }
+  .tdot:nth-child(3){ animation-delay:.3s; }
+  @keyframes tbounce{
+    0%,60%,100%{ transform:translateY(0); opacity:.4; }
+    30%{ transform:translateY(-5px); opacity:1; }
+  }
+
+  /* welcome hero */
+  #welcome{
+    max-width:640px; margin:6vh auto 0;
+    text-align:center;
+  }
+  #welcome .orbit-mark{
+    width:88px; height:88px; margin:0 auto 18px;
+    border-radius:50%;
+    background:radial-gradient(circle at 38% 32%, rgba(62,240,255,0.5), rgba(138,107,255,0.15) 60%, transparent 75%);
+    border:1px solid rgba(62,240,255,0.4);
+    box-shadow:0 0 40px rgba(62,240,255,0.3), inset 0 0 30px rgba(138,107,255,0.2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:30px;
+    animation:float 5s ease-in-out infinite;
+  }
+  @keyframes float{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(-8px); }
+  }
+  #welcome h2{
+    font-family:var(--font-display);
+    font-size:26px;
+    letter-spacing:.03em;
+    color:var(--text-hi);
+  }
+  #welcome p{
+    color:var(--text-mid);
+    margin-top:10px;
+    font-size:14.5px;
+    line-height:1.6;
+  }
+  #chip-row{
+    display:flex; flex-wrap:wrap; gap:9px;
+    justify-content:center;
+    margin-top:22px;
+  }
+  .chip{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid rgba(62,240,255,0.25);
+    background:rgba(62,240,255,0.05);
+    color:var(--cyan);
+    cursor:pointer;
+    transition:all .2s ease;
+    letter-spacing:.02em;
+  }
+  .chip:hover{
+    background:rgba(62,240,255,0.15);
+    box-shadow:0 0 16px rgba(62,240,255,0.25);
+    transform:translateY(-2px);
+  }
+
+  /* ============ INPUT DOCK ============ */
+  #dock{
+    flex-shrink:0;
+    padding:16px 8% 20px;
+    border-top:1px solid rgba(62,240,255,0.12);
+    background:linear-gradient(0deg, rgba(5,6,15,0.7), transparent);
+  }
+  #input-shell{
+    max-width:760px; margin:0 auto;
+    display:flex; align-items:center; gap:10px;
+    background:rgba(11,14,31,0.8);
+    border:1px solid rgba(62,240,255,0.25);
+    border-radius:16px;
+    padding:6px 8px 6px 18px;
+    box-shadow:0 0 0 1px rgba(62,240,255,0.04), 0 8px 30px rgba(0,0,0,0.4);
+    transition:border-color .2s ease, box-shadow .2s ease;
+  }
+  #input-shell:focus-within{
+    border-color:rgba(62,240,255,0.6);
+    box-shadow:0 0 24px rgba(62,240,255,0.18);
+  }
+  #user-input{
+    flex:1;
+    background:none; border:none; outline:none;
+    color:var(--text-hi);
+    font-family:var(--font-body);
+    font-size:15px;
+    padding:10px 0;
+  }
+  #user-input::placeholder{ color:var(--text-dim); }
+
+  #send-btn{
+    width:42px; height:42px; flex-shrink:0;
+    border-radius:12px; border:none; cursor:pointer;
+    background:linear-gradient(135deg, var(--cyan), var(--violet));
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .15s ease, box-shadow .15s ease;
+    box-shadow:0 0 16px rgba(62,240,255,0.35);
+  }
+  #send-btn:hover{ transform:scale(1.06); box-shadow:0 0 22px rgba(62,240,255,0.55); }
+  #send-btn:active{ transform:scale(.94); }
+  #send-btn svg{ width:18px; height:18px; }
+
+  #dock-foot{
+    display:flex; justify-content:space-between;
+    max-width:760px; margin:8px auto 0;
+    font-family:var(--font-mono);
+    font-size:9.5px;
+    color:var(--text-dim);
+    letter-spacing:.04em;
+  }
+  #dock-foot span b{ color:var(--cyan-dim); }
+  .cmd-hint{ cursor:pointer; }
+  .cmd-hint:hover{ color:var(--cyan); }
+
+  /* responsive */
+  @media (max-width: 880px){
+    #app{ grid-template-columns: 1fr; }
+    #orbit-panel{
+      position:fixed; left:0; top:0; bottom:0; width:78vw; max-width:300px;
+      z-index:20;
+      transform:translateX(-100%);
+      transition:transform .3s ease;
+      box-shadow:30px 0 60px rgba(0,0,0,0.6);
+    }
+    #orbit-panel.open{ transform:translateX(0); }
+    #menu-toggle{ display:flex; }
+    #scroll-area{ padding:24px 5% 18px; }
+    #dock{ padding:14px 4% 16px; }
+    #welcome{ margin-top:2vh; }
+  }
+  #menu-toggle{
+    display:none;
+    width:36px; height:36px; border-radius:10px;
+    border:1px solid rgba(62,240,255,0.3);
+    background:rgba(62,240,255,0.06);
+    align-items:center; justify-content:center;
+    cursor:pointer; color:var(--cyan);
+  }
+  #scrim{
+    display:none;
+    position:fixed; inset:0; z-index:15;
+    background:rgba(0,0,0,0.5);
+  }
+  #scrim.show{ display:block; }
+
+  ::selection{ background:rgba(62,240,255,0.3); }
+</style>
+</head>
+<body>
+
+<div id="space"></div>
+<div id="stars-far"></div>
+<div id="stars-near"></div>
+<svg class="nebula-line" width="100%" height="100%">
+  <defs>
+    <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3ef0ff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#3ef0ff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#3ef0ff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div id="app">
+
+  <!-- ORBIT SIDEBAR -->
+  <aside id="orbit-panel">
+    <div id="brand">
+      <div class="tag">// Natural Language Engine</div>
+      <h1>SOHAIBBOT</h1>
+      <div class="by">Muhammad Sohaib Imran · FAST-NUCES, FinTech</div>
+    </div>
+
+    <div id="orbit-stage">
+      <svg id="orbit-svg" viewBox="0 0 300 420" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div id="topic-foot">
+      <div class="lbl">Active Topic</div>
+      <div id="topic-name">— awaiting input —</div>
+    </div>
+  </aside>
+
+  <div id="scrim"></div>
+
+  <!-- MAIN CHAT -->
+  <main id="main">
+    <div id="status-bar">
+      <div class="status-left">
+        <div id="menu-toggle">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/></svg>
+        </div>
+        <div class="pulse-dot"></div>
+        <div id="status-text">SYSTEM ONLINE — NLP CORE READY</div>
+      </div>
+      <div class="status-right">
+        <span>MSG <b id="msg-count">0</b></span>
+        <span id="clock-display">00:00:00</span>
+      </div>
+    </div>
+
+    <div id="scroll-area">
+      <div id="welcome">
+        <div class="orbit-mark">🤖</div>
+        <h2>Transmission Channel Open</h2>
+        <p>I'm SohaibBot — ask me about crypto, blockchain, DeFi, FinTech, AI, or Pakistan's tech scene. I can also crunch quick math, tell jokes, or just chat.</p>
+        <div id="chip-row">
+          <div class="chip" data-q="What is Bitcoin?">₿ What is Bitcoin?</div>
+          <div class="chip" data-q="Explain DeFi">🏦 Explain DeFi</div>
+          <div class="chip" data-q="Crypto trading tips">📈 Trading tips</div>
+          <div class="chip" data-q="Tell me a joke">😄 Tell me a joke</div>
+          <div class="chip" data-q="Who made you?">👨‍💻 Who made you?</div>
+          <div class="chip" data-q="125 * 8">🧮 125 * 8</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="dock">
+      <div id="input-shell">
+        <input id="user-input" type="text" placeholder="Transmit a message to SohaibBot..." autocomplete="off" />
+        <button id="send-btn" aria-label="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#05060f" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div id="dock-foot">
+        <span>Try: <b class="cmd-hint" data-q="help">help</b> · <b class="cmd-hint" data-q="history">history</b> · <b class="cmd-hint" data-q="clear">clear</b></span>
+        <span id="sentiment-tag">SENTIMENT: —</span>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* ====================================================================
+   SOHAIBBOT — JS PORT OF THE PYTHON NLP ENGINE (ai_chatbot.py)
+   Faithful reproduction of INTENTS, detect_intent, calculate_math,
+   detect_sentiment, get_response.
+==================================================================== */
+
+const INTENTS = {
+  greeting: {
+    patterns: ["hello","hi","hey","good morning","good evening","good afternoon","howdy","whats up","what's up","sup"],
+    responses: [
+      "Hey! 👋 I'm SohaibBot. How can I help you today?",
+      "Hello! Great to see you. What's on your mind?",
+      "Hi there! I'm here to help. Ask me anything!",
+      "Hey! Ready to chat. What would you like to know?"
+    ]
+  },
+  farewell: {
+    patterns: ["bye","goodbye","see you","later","take care","exit","quit","cya","peace","farewell"],
+    responses: [
+      "Goodbye! Have a great day! 👋",
+      "See you later! Take care! 😊",
+      "Bye! Come back anytime you need help!",
+      "Take care! It was great chatting with you! 🌟"
+    ]
+  },
+  thanks: {
+    patterns: ["thank you","thanks","thank","thx","appreciate","helpful","great help","you're great"],
+    responses: [
+      "You're welcome! 😊 Happy to help!",
+      "Anytime! That's what I'm here for! 🌟",
+      "Glad I could help! Let me know if you need anything else.",
+      "My pleasure! Feel free to ask more questions!"
+    ]
+  },
+  identity: {
+    patterns: ["who are you","what are you","your name","introduce yourself","tell me about yourself","what can you do","your purpose"],
+    responses: [
+      "I'm SohaibBot 🤖 — an AI chatbot built by Muhammad Sohaib Imran, a FinTech student at FAST-NUCES Lahore. I can help with crypto, finance, coding, and general knowledge!",
+      "I'm SohaibBot! Created by Muhammad Sohaib Imran as an AI project. I understand natural language and can answer questions about crypto, finance, and much more!"
+    ]
+  },
+  creator: {
+    patterns: ["who made you","who created you","who built you","who is your creator","who programmed you","who is sohaib"],
+    responses: [
+      "I was built by Muhammad Sohaib Imran 👨‍💻 — a FinTech student at FAST-NUCES Lahore, Pakistan. He's a crypto trader, entrepreneur, and AI enthusiast!",
+      "My creator is Muhammad Sohaib Imran — a passionate FinTech student, 6-year crypto trader, and entrepreneur from Lahore, Pakistan! 🇵🇰"
+    ]
+  },
+  crypto_general: {
+    patterns: ["what is crypto","what is cryptocurrency","explain crypto","how does crypto work","what is blockchain","tell me about crypto"],
+    responses: [
+      "Cryptocurrency 💰 is a digital or virtual currency secured by cryptography, making it nearly impossible to counterfeit. It operates on decentralized networks using blockchain technology — a distributed ledger that records all transactions across thousands of computers.",
+      "Crypto is digital money that uses blockchain technology. Unlike traditional currencies, it's decentralized — meaning no bank or government controls it. Bitcoin was the first cryptocurrency, created in 2009 by the mysterious Satoshi Nakamoto! 🔗"
+    ]
+  },
+  bitcoin: {
+    patterns: ["what is bitcoin","tell me about bitcoin","bitcoin price","should i buy bitcoin","btc","bitcoin explain"],
+    responses: [
+      "Bitcoin (BTC) ₿ is the world's first and most valuable cryptocurrency, created in 2009. It has a fixed supply of 21 million coins, making it deflationary. Many call it 'digital gold' as a store of value!",
+      "Bitcoin is the king of crypto! 👑 It was created by the anonymous Satoshi Nakamoto in 2009. With a max supply of 21 million BTC, it's scarce by design. As a 6-year trader, I'd say always do your own research before investing!"
+    ]
+  },
+  ethereum: {
+    patterns: ["what is ethereum","tell me about ethereum","eth","ethereum explain","smart contracts","what are smart contracts"],
+    responses: [
+      "Ethereum (ETH) is the second largest cryptocurrency and a programmable blockchain. It introduced smart contracts — self-executing code that runs when conditions are met. Most DeFi apps and NFTs are built on Ethereum! 🔷",
+      "Ethereum is like a world computer! 💻 Unlike Bitcoin which is just digital money, Ethereum lets developers build decentralized apps (dApps) on it. Smart contracts automatically execute agreements without middlemen!"
+    ]
+  },
+  trading: {
+    patterns: ["how to trade crypto","crypto trading tips","trading advice","how to invest in crypto","trading strategy","when to buy","when to sell","trading for beginners"],
+    responses: [
+      "As someone who's been trading crypto for 6 years, here are my top tips 📈:\n  1. Never invest more than you can afford to lose\n  2. Always do your own research (DYOR)\n  3. Understand market cycles (bull/bear)\n  4. Use stop losses to protect capital\n  5. Don't let emotions drive decisions\n  6. Diversify your portfolio",
+      "Crypto trading tips from 6 years of experience 🎯:\n  • Start small and learn the markets\n  • Study technical analysis (support/resistance, RSI, MACD)\n  • Never chase pumps\n  • Take profits along the way\n  • Long-term holding (HODLing) often beats short-term trading!"
+    ]
+  },
+  defi: {
+    patterns: ["what is defi","decentralized finance","defi explain","yield farming","liquidity pool","staking"],
+    responses: [
+      "DeFi (Decentralized Finance) 🏦 is a financial system built on blockchain that operates without banks or intermediaries. You can lend, borrow, trade, and earn interest using smart contracts. Popular DeFi platforms include Uniswap, Aave, and Compound!",
+      "DeFi is like a bank without the bank! 🔓 It uses smart contracts to offer financial services — lending, borrowing, earning interest (yield farming), and trading — all without needing permission from any institution. Very exciting space!"
+    ]
+  },
+  fintech: {
+    patterns: ["what is fintech","fintech explain","financial technology","fintech examples","future of finance"],
+    responses: [
+      "FinTech (Financial Technology) 💳 is the use of technology to improve and automate financial services. Examples include mobile banking apps (JazzCash, Easypaisa in Pakistan), crypto exchanges, robo-advisors, and AI-powered fraud detection!",
+      "FinTech is transforming how we handle money! 🚀 It includes everything from mobile payments and digital banking to AI-driven investment platforms. As a FinTech student at FAST, I'm excited to be part of this revolution in Pakistan!"
+    ]
+  },
+  ai: {
+    patterns: ["what is ai","artificial intelligence","machine learning","deep learning","explain ai","future of ai","ai in finance"],
+    responses: [
+      "Artificial Intelligence (AI) 🤖 is the simulation of human intelligence by machines. It includes Machine Learning (systems that learn from data), Deep Learning (neural networks), and Natural Language Processing (understanding human language — like what I use!).",
+      "AI is transforming every industry! 🌍 In finance, AI is used for fraud detection, algorithmic trading, credit scoring, and risk assessment. Combined with FinTech, AI is creating a smarter financial future. This is exactly why I'm passionate about AI + FinTech! 🚀"
+    ]
+  },
+  pakistan_tech: {
+    patterns: ["pakistan tech","tech in pakistan","netsol","systems limited","pakistan software","pakistan startups","tech jobs pakistan"],
+    responses: [
+      "Pakistan's tech industry is booming! 🇵🇰 Top companies include Netsol Technologies (global leader in leasing software), Systems Limited, Arbisoft, and Tintash. Pakistan exports over $2 billion in IT services annually!",
+      "Pakistan has a thriving tech ecosystem! 💡 Netsol Technologies, based in Lahore, is listed on NASDAQ and serves clients in over 30 countries. Systems Limited is another giant. The future for Pakistani tech graduates is very bright! 🌟"
+    ]
+  },
+  time: { patterns: ["what time is it","current time","what is the time","time now"], responses: [] },
+  date: { patterns: ["what date is it","today's date","what day is it","current date"], responses: [] },
+  joke: {
+    patterns: ["tell me a joke","joke","make me laugh","say something funny","funny","humor"],
+    responses: [
+      "Why do programmers prefer dark mode? Because light attracts bugs! 🐛😄",
+      "Why did the crypto investor lose all his money? He kept buying high and selling low — and called it a 'strategy'! 😂",
+      "A SQL query walks into a bar, walks up to two tables and asks... 'Can I join you?' 🍺😄",
+      "Why don't scientists trust atoms? Because they make up everything! ⚛️😂",
+      "How many programmers does it take to change a light bulb? None — that's a hardware problem! 💡😄"
+    ]
+  },
+  motivation: {
+    patterns: ["motivate me","i need motivation","inspire me","feeling down","feeling lazy","give me motivation","i want to give up"],
+    responses: [
+      "You've got this! 💪 Remember — every expert was once a beginner. Keep pushing forward, one day at a time!",
+      "Success is not final, failure is not fatal — it's the courage to continue that counts! 🌟 Keep going!",
+      "Think about why you started. Every line of code, every project, every late night is building your future empire! 🚀",
+      "The best time to start was yesterday. The second best time is NOW! 🔥 Let's go!"
+    ]
+  },
+  math: { patterns: ["calculate","what is","math","plus","minus","multiply","divide","sum","addition","subtraction"], responses: [] },
+  help: {
+    patterns: ["help","what can you do","commands","features","how to use","capabilities","menu"],
+    responses: [
+`I can help you with: 📋
+  🪙 Crypto — Bitcoin, Ethereum, DeFi, trading tips
+  💹 Finance — FinTech, investing, markets
+  🤖 AI & Tech — Artificial intelligence, machine learning
+  🇵🇰 Pakistan Tech — Netsol, tech industry
+  😄 Fun — Jokes, motivation, casual chat
+  🧮 Math — Simple calculations
+  ⏰ Time & Date — Current time and date
+
+  Just type naturally and I'll understand you!`
+    ]
+  },
+  unknown: {
+    patterns: [],
+    responses: [
+      "Hmm, I'm not sure about that one! 🤔 Try asking about crypto, finance, AI, or tech!",
+      "I didn't quite get that. Could you rephrase? Or type 'help' to see what I can do! 😊",
+      "Interesting question! I'm still learning. Try asking about crypto, FinTech, or AI! 🤖",
+      "That's beyond my current knowledge! Type 'help' to see what topics I cover. 📚"
+    ]
+  }
+};
+
+// orbit ordering + visual metadata (excludes unknown/math/time/date which are not "topics")
+const ORBIT_TOPICS = [
+  { key:"identity",       label:"Identity",  color:"#3ef0ff", glyph:"◎" },
+  { key:"crypto_general", label:"Crypto",    color:"#ffd35c", glyph:"₪" },
+  { key:"bitcoin",        label:"Bitcoin",   color:"#ff9f40", glyph:"₿" },
+  { key:"ethereum",       label:"Ethereum",  color:"#8a6bff", glyph:"◆" },
+  { key:"defi",           label:"DeFi",      color:"#3ef0ff", glyph:"⬡" },
+  { key:"trading",        label:"Trading",   color:"#ff3ec8", glyph:"▲" },
+  { key:"fintech",        label:"FinTech",   color:"#5cffb0", glyph:"⬢" },
+  { key:"ai",             label:"AI / ML",   color:"#3ef0ff", glyph:"✦" },
+  { key:"pakistan_tech",  label:"PK Tech",   color:"#5cffb0", glyph:"●" },
+  { key:"joke",           label:"Humor",     color:"#ffd35c", glyph:"☺" },
+  { key:"motivation",     label:"Motivate",  color:"#ff3ec8", glyph:"★" },
+  { key:"help",           label:"Help",      color:"#9fb3d6", glyph:"?" },
+];
+
+function preprocess(text){
+  return text.toLowerCase().trim().replace(/[^\w\s]/g, "");
+}
+
+function calculateMath(expression){
+  const m = expression.match(/(\d+\.?\d*)\s*([\+\-\*\/x])\s*(\d+\.?\d*)/);
+  if(!m) return null;
+  const a = parseFloat(m[1]);
+  const op = m[2];
+  const b = parseFloat(m[3]);
+  let result, symbol;
+  if(op === '+'){ result = a + b; symbol = '+'; }
+  else if(op === '-'){ result = a - b; symbol = '-'; }
+  else if(op === '*' || op === 'x'){ result = a * b; symbol = '×'; }
+  else if(op === '/'){
+    if(b === 0) return "❌ Cannot divide by zero!";
+    result = a / b; symbol = '÷';
+  } else return null;
+
+  result = (result === Math.trunc(result)) ? Math.trunc(result) : Math.round(result*10000)/10000;
+  return `🧮 ${a} ${symbol} ${b} = ${result}`;
+}
+
+function detectSentiment(text){
+  const positive = ["good","great","awesome","amazing","love","happy","excellent","perfect","wonderful","fantastic"];
+  const negative = ["bad","terrible","hate","awful","sad","angry","horrible","worst","disappointed","upset"];
+  const cleaned = text.toLowerCase();
+  const posCount = positive.reduce((c,w)=> c + (cleaned.includes(w)?1:0), 0);
+  const negCount = negative.reduce((c,w)=> c + (cleaned.includes(w)?1:0), 0);
+  if(posCount > negCount) return "positive";
+  if(negCount > posCount) return "negative";
+  return "neutral";
+}
+
+function detectIntent(userInput){
+  const cleaned = preprocess(userInput);
+
+  const mathPattern = cleaned.match(/(\d+)\s*([\+\-\*\/x])\s*(\d+)/);
+  const hasDigit = /\d/.test(cleaned);
+  const mathWord = (cleaned.includes('calculate') || cleaned.includes('what is')) && hasDigit;
+  if(mathPattern || mathWord){
+    return { intent:"math", extra:mathPattern };
+  }
+
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for(const intent in INTENTS){
+    if(intent === "unknown" || intent === "math") continue;
+    const data = INTENTS[intent];
+    for(const pattern of data.patterns){
+      const patternWords = pattern.split(" ");
+      const matches = patternWords.reduce((c,w)=> c + (cleaned.includes(w) ? 1 : 0), 0);
+      let score = patternWords.length ? matches / patternWords.length : 0;
+      if(cleaned.includes(pattern)) score += 0.5;
+      if(score > bestScore){
+        bestScore = score;
+        bestMatch = intent;
+      }
+    }
+  }
+
+  if(bestScore >= 0.4) return { intent: bestMatch, extra: null };
+  return { intent: "unknown", extra: null };
+}
+
+function choice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function getResponse(intent, userInput){
+  if(intent === "math"){
+    const result = calculateMath(userInput);
+    if(result) return result;
+    return "I couldn't calculate that. Try something like '25 + 75' or '100 / 4'! 🧮";
+  }
+  if(intent === "time"){
+    const now = new Date();
+    const h12 = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const h24 = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12:false});
+    return `⏰ Current time: ${h12} (${h24})`;
+  }
+  if(intent === "date"){
+    const now = new Date();
+    const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+    return `📅 Today is ${now.toLocaleDateString('en-US', opts)}`;
+  }
+  if(INTENTS[intent] && INTENTS[intent].responses.length){
+    let response = choice(INTENTS[intent].responses);
+    const sentiment = detectSentiment(userInput);
+    if(sentiment === "negative" && intent === "unknown"){
+      response = "I sense some frustration — sorry about that! 😔 " + response;
+    }
+    return response;
+  }
+  return choice(INTENTS["unknown"].responses);
+}
+
+/* ====================================================================
+   UI WIRING
+==================================================================== */
+
+const scrollArea = document.getElementById("scroll-area");
+const welcome = document.getElementById("welcome");
+const userInput = document.getElementById("user-input");
+const sendBtn = document.getElementById("send-btn");
+const msgCountEl = document.getElementById("msg-count");
+const topicNameEl = document.getElementById("topic-name");
+const sentimentTag = document.getElementById("sentiment-tag");
+const clockDisplay = document.getElementById("clock-display");
+const menuToggle = document.getElementById("menu-toggle");
+const orbitPanel = document.getElementById("orbit-panel");
+const scrim = document.getElementById("scrim");
+
+let conversationCount = 0;
+let history = [];
+let activePlanetKey = null;
+
+function timeStamp(){
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function tickClock(){
+  clockDisplay.textContent = new Date().toLocaleTimeString([], {hour12:false});
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+function appendMessage(role, text){
+  if(welcome.parentNode) welcome.remove();
+  const row = document.createElement("div");
+  row.className = `msg-row ${role}`;
+  const avatar = document.createElement("div");
+  avatar.className = `avatar ${role}`;
+  avatar.textContent = role === "bot" ? "🤖" : "🧑‍🚀";
+  const col = document.createElement("div");
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = text;
+  const meta = document.createElement("div");
+  meta.className = "msg-meta";
+  meta.textContent = (role === "bot" ? "SohaibBot" : "You") + " · " + timeStamp();
+  col.appendChild(bubble);
+  col.appendChild(meta);
+  row.appendChild(avatar);
+  row.appendChild(col);
+  scrollArea.appendChild(row);
+  scrollArea.scrollTop = scrollArea.scrollHeight;
+  return row;
+}
+
+function showTyping(){
+  if(welcome.parentNode) welcome.remove();
+  const row = document.createElement("div");
+  row.className = "msg-row bot typing";
+  row.id = "typing-row";
+  const avatar = document.createElement("div");
+  avatar.className = "avatar bot";
+  avatar.textContent = "🤖";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = `<span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>`;
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  scrollArea.appendChild(row);
+  scrollArea.scrollTop = scrollArea.scrollHeight;
+}
+
+function removeTyping(){
+  const t = document.getElementById("typing-row");
+  if(t) t.remove();
+}
+
+function setActivePlanet(intentKey){
+  const found = ORBIT_TOPICS.find(t => t.key === intentKey);
+  document.querySelectorAll(".planet").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".orbit-ring").forEach(r => r.classList.remove("active"));
+  if(found){
+    activePlanetKey = found.key;
+    const el = document.getElementById("planet-" + found.key);
+    if(el){
+      el.classList.add("active");
+      const ring = document.getElementById("ring-" + found.key);
+      if(ring) ring.classList.add("active");
+    }
+    topicNameEl.textContent = found.label;
+    topicNameEl.style.color = found.color;
+  } else {
+    topicNameEl.textContent = "General / Unclassified";
+    topicNameEl.style.color = "var(--text-mid)";
+  }
+}
+
+function handleSpecialCommands(raw){
+  const lower = raw.toLowerCase().trim();
+  if(["quit","exit","q"].includes(lower)){
+    appendMessage("user", raw);
+    appendMessage("bot", "Goodbye! Have a great day! 👋");
+    userInput.disabled = true;
+    userInput.placeholder = "Transmission ended.";
+    return true;
+  }
+  if(["clear","cls"].includes(lower)){
+    document.querySelectorAll(".msg-row").forEach(r => r.remove());
+    scrollArea.appendChild(welcome);
+    history = [];
+    conversationCount = 0;
+    msgCountEl.textContent = "0";
+    setActivePlanet(null);
+    return true;
+  }
+  if(lower === "history"){
+    appendMessage("user", raw);
+    if(history.length === 0){
+      appendMessage("bot", "No history yet!");
+    } else {
+      const recent = history.slice(-10);
+      const lines = recent.map(h => `👤 ${h.user}\n🤖 ${h.bot.slice(0,60)}...`).join("\n\n");
+      appendMessage("bot", "📜 CONVERSATION HISTORY\n\n" + lines);
+    }
+    return true;
+  }
+  return false;
+}
+
+function sendMessage(text){
+  const raw = (text !== undefined ? text : userInput.value).trim();
+  if(!raw) return;
+  userInput.value = "";
+
+  if(handleSpecialCommands(raw)) return;
+
+  appendMessage("user", raw);
+  sentimentTag.textContent = "SENTIMENT: " + detectSentiment(raw).toUpperCase();
+
+  showTyping();
+
+  const thinkTime = 420 + Math.random()*480;
+  setTimeout(() => {
+    removeTyping();
+    const { intent } = detectIntent(raw);
+    const response = getResponse(intent, raw);
+    appendMessage("bot", response);
+    setActivePlanet(intent);
+
+    history.push({ user: raw, bot: response });
+    conversationCount++;
+    msgCountEl.textContent = String(conversationCount);
+
+    if(conversationCount % 5 === 0){
+      setTimeout(() => {
+        appendMessage("bot", `💬 We've exchanged ${conversationCount} messages! Type 'help' to explore more topics.`);
+      }, 350);
+    }
+  }, thinkTime);
+}
+
+sendBtn.addEventListener("click", () => sendMessage());
+userInput.addEventListener("keydown", (e) => {
+  if(e.key === "Enter") sendMessage();
+});
+
+document.querySelectorAll(".chip, .cmd-hint").forEach(el => {
+  el.addEventListener("click", () => {
+    const q = el.getAttribute("data-q");
+    sendMessage(q);
+  });
+});
+
+menuToggle.addEventListener("click", () => {
+  orbitPanel.classList.add("open");
+  scrim.classList.add("show");
+});
+scrim.addEventListener("click", () => {
+  orbitPanel.classList.remove("open");
+  scrim.classList.remove("show");
+});
+
+/* clicking a planet drops its representative query into the input */
+function planetSampleQuery(key){
+  const data = INTENTS[key];
+  if(data && data.patterns.length) return data.patterns[0];
+  return key;
+}
+
+/* ====================================================================
+   ORBIT SOLAR SYSTEM RENDER (SVG)
+==================================================================== */
+function buildOrbitSystem(){
+  const svg = document.getElementById("orbit-svg");
+  const cx = 150, cy = 200;
+  const baseR = 34;
+  const step = 16.5;
+  const n = ORBIT_TOPICS.length;
+
+  let svgContent = "";
+
+  // defs: glow filters
+  svgContent += `<defs>
+    <radialGradient id="coreGrad" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#bdf6ff"/>
+      <stop offset="45%" stop-color="#3ef0ff"/>
+      <stop offset="100%" stop-color="#1c5a66"/>
+    </radialGradient>
+  </defs>`;
+
+  // orbit rings
+  ORBIT_TOPICS.forEach((t, i) => {
+    const r = baseR + i*step;
+    svgContent += `<circle id="ring-${t.key}" class="orbit-ring" cx="${cx}" cy="${cy}" r="${r}"></circle>`;
+  });
+
+  // core (sun) = the bot itself
+  svgContent += `
+    <circle class="core-glow" cx="${cx}" cy="${cy}" r="14" fill="url(#coreGrad)"></circle>
+    <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="12" fill="#05060f" font-weight="700">AI</text>
+  `;
+
+  // planets, distributed at varied angles with slow orbit animation via CSS custom properties using SMIL animateTransform
+  ORBIT_TOPICS.forEach((t, i) => {
+    const r = baseR + i*step;
+    const startAngle = (i * (360/n) * 1.7) % 360; // spread them out, not evenly stacked
+    const dur = 40 + i*7; // seconds, varied speeds
+    const dir = i % 2 === 0 ? "1 0 360" : "1 0 -360"; // unused; using from/to below
+
+    const groupId = `planet-${t.key}`;
+    svgContent += `
+      <g class="planet" id="${groupId}" data-key="${t.key}" data-label="${t.label}">
+        <animateTransform attributeName="transform" type="rotate"
+          from="${startAngle} ${cx} ${cy}" to="${startAngle - 360} ${cx} ${cy}"
+          dur="${dur}s" repeatCount="indefinite" />
+        <g transform="translate(${r},0)">
+          <circle class="planet-body" r="6.5" fill="${t.color}" style="color:${t.color}"></circle>
+          <text class="planet-label" x="0" y="-11" text-anchor="middle">${t.label}</text>
+        </g>
+      </g>
+    `;
+  });
+
+  svg.innerHTML = svgContent;
+
+  // attach click handlers (after innerHTML set)
+  ORBIT_TOPICS.forEach(t => {
+    const el = document.getElementById("planet-" + t.key);
+    if(el){
+      el.addEventListener("click", () => {
+        sendMessage(planetSampleQuery(t.key));
+      });
+    }
+  });
+}
+
+buildOrbitSystem();
+
+/* ====================================================================
+   STARFIELD GENERATION
+==================================================================== */
+function buildStars(containerId, count, sizeMin, sizeMax, speedMin, speedMax){
+  const container = document.getElementById(containerId);
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<count;i++){
+    const s = document.createElement("div");
+    s.className = "star";
+    const size = (Math.random()*(sizeMax-sizeMin)+sizeMin).toFixed(2);
+    s.style.width = size+"px";
+    s.style.height = size+"px";
+    s.style.left = (Math.random()*100)+"%";
+    s.style.top = (Math.random()*100)+"%";
+    s.style.setProperty("--dur", (Math.random()*(speedMax-speedMin)+speedMin).toFixed(2)+"s");
+    s.style.setProperty("--delay", (Math.random()*5).toFixed(2)+"s");
+    frag.appendChild(s);
+  }
+  container.appendChild(frag);
+}
+buildStars("stars-far", 90, 0.6, 1.4, 3, 7);
+buildStars("stars-near", 50, 1.2, 2.4, 2, 5);
+
+/* initial focus */
+userInput.focus();
+</script>
+</body>
+</html>
